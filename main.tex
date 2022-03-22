@@ -1,0 +1,118 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=15mm]{geometry}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\lhead{IMI共同研究レポート（江木）}
+\rhead{\bf\thepage}
+
+\newcommand{\todo}[1]{\textcolor{red}{(TODO: #1)}}
+
+\usepackage{subcaption}
+\usepackage{hhline}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\definecolor{P@GrayBG}{gray}{.95}
+\definecolor{P@GrayComment}{gray}{.40}
+\RequirePackage{listings}
+\lstset{%
+  basicstyle=\footnotesize\ttfamily,%
+  escapechar=\`,
+  columns=fullflexible,
+  keepspaces=true,
+  extendedchars=true,
+  upquote=true,
+  captionpos=t,
+  backgroundcolor=\color{P@GrayBG},%
+  breaklines=true;
+  postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\hookrightarrow\space}},
+  numbers=left,
+%  numberstyle=\P@listingnumbersfont,
+  numbersep=.5em,
+  frame=single,
+  framerule=0pt}
+\lstdefinelanguage{egison}{%
+  alsoletter={-},
+  sensitive = true,
+  comment=[l]{--},
+}%
+
+\begin{document}
+
+\section*{直感的な数式表現のための言語機能の開発プロセス}
+\subsection*{プログラミング言語Egisonの紹介}
+
+江木が自身が中心となり開発を進めているプログラミング言語Egisonの紹介から始めた．
+Egisonは，直感的にプログラムとして表現できるアルゴリズムの範囲を広げたいという動機のもとに作れられたプログラミング言語であり，この動機のもとに発明された2つの新しい機能をもつ．
+
+1つ目の機能は，非自由データ型のパターンマッチである．
+非自由データ型とは，集合やグラフ，数式のように1つの定まった標準形をもたないデータ型のことをいう．
+Egisonは，これらの非自由データ型に対するパターンマッチの方法をユーザが定義し，使うことができる．
+
+2つ目の機能は，微分幾何の計算を表現するために使われる数学記法であるテンソルの添字記法のプログラミングへの導入である．
+添字記法を使った数式の記述と添字記法をサポートするテンソル演算子の定義の両方を同時に簡潔にする手法により，添字記法が実装されている．
+
+\subsection*{2020年以降に実装した新機能の紹介}
+
+次に最近実装した新機能を紹介した．
+
+\subsubsection*{テンソルの対称性の宣言}
+
+リーマン曲率テンソルは三つの対称性$R_{abcd} = -R_{abdc}$，$R_{abcd} = -R_{bacd}$，$R_{abcd} = R_{cdab}$をもつ．
+テンソルの定義と同時にこれらを同時に宣言する構文を開発したことを紹介した．
+この構文を使ってEgisonではリーマン曲率テンソルは下記のように定義できる．
+\begin{lstlisting}[language=egison,numbers=none]
+def R{[_a_b][_c_d]} := withSymbols [i, j]
+  g_a_i . (`$\partial$`/`$\partial$` `$\Gamma$`~i_b_d x~c - `$\partial$`/`$\partial$` `$\Gamma$`~i_b_c x~d +
+           `$\Gamma$`~j_b_d . `$\Gamma$`~i_j_c - `$\Gamma$`~j_b_c . `$\Gamma$`~i_j_d)
+\end{lstlisting}
+右辺にリーマン曲率テンソルを定義する複雑な式があるが，本稿では無視していただいて問題ない．
+左辺だけに注目する．
+添字が角括弧と波括弧で囲まれている．
+角括弧で囲まれた添字には歪対称性が，波括弧で囲まれた添字には対称性が宣言される．
+
+\subsubsection*{添字付きテンソル演算子の定義}
+
+シンボリックな添字の複雑な操作が必要なテンソル演算子の定義を可能にする仕組みを開発した．
+このようなテンソル演算子には例えば共変微分がある．
+テンソル$T$に左辺と右辺で違う添字が付加されている．
+\begin{equation}
+\begin{split}
+\nabla_{c} T^{a_{1} \cdots a_{r}}_{\ \ \ \ \ \ \ b_{1} \cdots b_{k}} &=
+\frac{\partial}{\partial x^{c}} T^{a_{1} \cdots a_{r}}_{\ \ \ \ \ \ \ b_{1} \cdots b_{k}} \\
+& + \Gamma^{a_1}_{\ \ dc} T^{d a_{2} \cdots a_{r}}_{\ \ \ \ \ \ \ \ b_{1} \cdots b_{k}} + \cdots + \Gamma^{a_r}_{\ \ dc} T^{a_{1} \cdots a_{r-1} d}_{\ \ \ \ \ \ \ \ \ \ \ b_{1} \cdots b_{k}} \\
+& - \Gamma^{d}_{\ a_{1} c} T^{a_{1} \cdots a_{r}}_{\ \ \ \ \ \ \ d b_{2} \cdots b_{k}} - \cdots - \Gamma^{d}_{\ b_{k} c} T^{a_{1} \cdots a_{r}}_{\ \ \ \ \ \ \ b_{1} \cdots b_{k-1} d} \nonumber
+\end{split}
+\end{equation}
+このような演算子の定義を可能にするためには，テンソルの添字のパターンマッチを可能にすればよい．
+\begin{lstlisting}
+def `$\nabla$`_c T~(a_1)...~(a_r)_(b_1)..._(b_k) :=
+  `$\partial$/$\partial$` T~(a_1)...~(a_r)_(b_1)..._(b_k) x~c
+  + sum (map (\i -> `$\Gamma$`~(a_i)_d_c .
+                    T~(a_1)...~(a_(i-1))~d~(a_(i+1))...~(a_r)_(b_1)..._(b_k))
+             [1..r])
+  - sum (map (\i -> `$\Gamma$`~d_(b_i)_c .
+                    T~(a_1)...~(a_r)_(b_1)..._(b_(i-1))_d_(b_(i+1))..._(b_k))
+             [1..k])
+\end{lstlisting}
+
+\subsection*{新しい言語機能の開発プロセス}
+
+新しい言語機能の開発するコツとして，(1)できるだけ色々な種類のアルゴリズムや数式をプログラムに落とそうと試みることと(2)新しい構文を開発する時には，プログラムに落としたい意味を構文木に効率的に埋め込むことを意識することを紹介した．
+
+\subsection*{質疑応答}
+
+\subsubsection*{教育利用の促進}
+
+さまざまな数学の概念をライブラリ関数としてブラックボックス化せずにユーザが自身で簡潔に定義できるEgisonは教育目的に使えるのではないかというフィードバックを藤本先生からいただいた．
+
+\subsubsection*{企業の研究者として大学との共同研究に期待するもの}
+
+企業の研究者を代表しての返答は難しかったのだが，プログラミング言語の研究者としては，
+研究の新しいアイデアにつながる有益な議論や，教育の場としての大学を活かしてEgisonの普及に協力していただけるとありがたいという返答をした．
+
+\end{document}
